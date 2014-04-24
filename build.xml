@@ -76,6 +76,19 @@
     <chmod file="${build.dir}/stream2gdrive*"  perm="755" />
   </target>
 
+  <target name="dist" depends="clean, jar" description="Build a distribution package">
+    <script language="javascript">
+      project.setProperty("git.version", project.getProperty("git.version").replaceAll("/", "+"));
+    </script>
+
+    <property name="dist.basename" value="Stream2GDrive-${git.version}"/>
+
+    <zip destfile="${dist.basename}.zip">
+      <zipfileset dir="build" includes="stream2gdrive*" filemode="755"/>
+    </zip>
+
+  </target>
+
   <target name="clean" description="clean up" >
     <delete dir="${build.dir}"/>
   </target>
