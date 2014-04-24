@@ -44,12 +44,14 @@ public class Stream2GDrive {
         throws Exception {
         Options opt = new Options();
 
-        opt.addOption("?",  "help",    false, "Show usage.");
-        opt.addOption("V",  "version", false, "Print version information.");
-        opt.addOption("v",  "verbose", false, "Display progress status.");
-        opt.addOption("p",  "parent",  true, "Operate inside this Google Drive folder instead of root.");
-        opt.addOption("m",  "mime",           true, "Override guessed MIME type.");
-        opt.addOption(null, "oob",           false, "Provide OAuth authentication out-of-band.");
+        opt.addOption("?",  "help",     false, "Show usage.");
+        opt.addOption("V",  "version",  false, "Print version information.");
+        opt.addOption("v",  "verbose",  false, "Display progress status.");
+
+        opt.addOption("p",  "parent",   true, "Operate inside this Google Drive folder instead of root.");
+        opt.addOption("o",  "output",   true, "Override output/destination file name");
+        opt.addOption("m",  "mime",     true, "Override guessed MIME type.");
+        opt.addOption(null, "oob",      false, "Provide OAuth authentication out-of-band.");
 
         try {
             CommandLine cmd = new GnuParser().parse(opt, args, false);
@@ -118,49 +120,43 @@ public class Stream2GDrive {
             }
 
             if (command.equals("get")) {
-                String remote;
-                String local;
+                String file;
 
                 if (args.length < 2) {
                     throw new ParseException("<file> missing");
                 }
                 else if (args.length == 2) {
-                    remote = local = args[1];
-                }
-                else if (args.length == 3) {
-                    remote = args[1];
-                    local  = args[2];
+                    file = args[1];
                 }
                 else {
                     throw new ParseException("Too many arguments");
                 }
 
-                download(client, ht, root, remote, local, cmd.hasOption("verbose"));
+                download(client, ht, root, file, cmd.getOptionValue("output", file), cmd.hasOption("verbose"));
             }
             else if (command.equals("put")) {
-                String local;
-                String remote;
+                String file;
 
                 if (args.length < 2) {
                     throw new ParseException("<file> missing");
                 }
                 else if (args.length == 2) {
-                    local  = args[1];
-                    remote = new File(local).getName();
-                }
-                else if (args.length == 3) {
-                    local  = args[1];
-                    remote = args[2];
+                    file  = args[1];
                 }
                 else {
                     throw new ParseException("Too many arguments");
                 }
 
-                upload(client, local, root,
-                       remote, cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(local)),
+                upload(client, file, root,
+                       cmd.getOptionValue("output", new File(file).getName()),
+                       cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(file)),
                        cmd.hasOption("verbose"));
             }
             else if (command.equals("md5") || command.equals("list")) {
+                if (args.length > 1) {
+                    throw new ParseException("Too many arguments");
+                }
+
                 list(client, root, command.equals("md5"));
             }
             else {
@@ -172,7 +168,7 @@ public class Stream2GDrive {
             HelpFormatter hf = new HelpFormatter();
 
             hf.printHelp(pw, 80, "stream2gdrive [OPTIONS] <cmd> [<options>]",
-                         "  Commands: get <file> [<local-file-name>], list, md5, put <file> [<remote-file-name>].",
+                         "  Commands: get <file>, list, md5, put <file>.",
                          opt, 2, 8,
                          "Use '-' as <file> for standard input.");
 
