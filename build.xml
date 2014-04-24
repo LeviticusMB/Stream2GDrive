@@ -70,6 +70,10 @@
         <fileset dir="${lib.dir}" includes="*.jar" />
       </lib>
     </one-jar>
+
+    <copy  file="${src.dir}/stream2gdrive"     todir="${build.dir}"/>
+    <copy  file="${src.dir}/stream2gdrive.bat" todir="${build.dir}"/>
+    <chmod file="${build.dir}/stream2gdrive*"  perm="755" />
   </target>
 
   <target name="clean" description="clean up" >

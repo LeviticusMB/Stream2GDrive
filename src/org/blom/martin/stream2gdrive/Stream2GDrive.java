@@ -171,7 +171,7 @@ public class Stream2GDrive {
             PrintWriter   pw = new PrintWriter(System.err);
             HelpFormatter hf = new HelpFormatter();
 
-            hf.printHelp(pw, 80, APP_NAME + " [OPTIONS] <cmd> [<options>]",
+            hf.printHelp(pw, 80, "stream2gdrive [OPTIONS] <cmd> [<options>]",
                          "  Commands: get <file> [<local-file-name>], list, md5, put <file> [<remote-file-name>].",
                          opt, 2, 8,
                          "Use '-' as <file> for standard input.");
