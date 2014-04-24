@@ -36,10 +36,6 @@ public class Stream2GDrive {
     private static final String APP_VERSION = "1.0";
     private static final int    CHUNK_SIZE  = 10 * 1024 * 1024;
 
-
-    private static final java.io.File DATA_STORE_DIR =
-        new java.io.File(System.getProperty("user.home"), ".store/drive_sample");
-
     public static void main(String[] args)
         throws Exception {
         Options opt = new Options();
@@ -99,7 +95,7 @@ public class Stream2GDrive {
             scopes.add(DriveScopes.DRIVE_METADATA_READONLY);
 
             GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(ht, jf, gcs, scopes)
-                .setDataStoreFactory(new FileDataStoreFactory(DATA_STORE_DIR))
+                .setDataStoreFactory(new FileDataStoreFactory(appDataDir()))
                 .build();
 
             VerificationCodeReceiver vcr = !cmd.hasOption("oob")
@@ -306,6 +302,28 @@ public class Stream2GDrive {
         throws IOException {
         return new InputStreamReader(Stream2GDrive.class.getResourceAsStream(name));
     }
+
+
+    private static File appDataDir() {
+        File root;
+        String os = System.getProperty("os.name").toLowerCase();
+
+        if (os.startsWith("windows")) {
+            root = new File(System.getenv("AppData"));
+        }
+        else if (os.startsWith("mac os x")) {
+            root = new File(System.getProperty("user.home"), "Library/Application Support");
+        }
+        else if (System.getenv("XDG_DATA_HOME") != null) {
+            root = new File(System.getenv("XDG_DATA_HOME"));
+        }
+        else {
+            root = new File(System.getProperty("user.home"), ".local/share");
+        }
+
+        return new File(root, APP_NAME);
+    }
+
 
     private static class StreamContent
         extends AbstractInputStreamContent {
