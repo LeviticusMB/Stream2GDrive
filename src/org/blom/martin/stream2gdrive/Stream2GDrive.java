@@ -16,47 +16,37 @@ package org.blom.martin.stream2gdrive;
 
 import java.io.*;
 import java.util.*;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.GnuParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-
+import org.apache.commons.cli.*;
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.java6.auth.oauth2.VerificationCodeReceiver;
+import com.google.api.client.extensions.java6.auth.oauth2.*;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.auth.oauth2.*;
 import com.google.api.client.googleapis.extensions.java6.auth.oauth2.GooglePromptReceiver;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.googleapis.media.MediaHttpUploader;
-import com.google.api.client.http.AbstractInputStreamContent;
-import com.google.api.client.http.FileContent;
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpTransport;
+import com.google.api.client.googleapis.media.*;
+import com.google.api.client.http.*;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.util.IOUtils;
 import com.google.api.client.util.store.FileDataStoreFactory;
-import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.DriveScopes;
+import com.google.api.services.drive.*;
 import com.google.api.services.drive.model.ParentReference;
 
 public class Stream2GDrive {
-    private static final String APP_NAME = "Stream2GDrive";
+    private static final String APP_NAME    = "Stream2GDrive";
     private static final String APP_VERSION = "1.0";
+    private static final int    CHUNK_SIZE  = 10 * 1024 * 1024;
+
 
     private static final java.io.File DATA_STORE_DIR =
         new java.io.File(System.getProperty("user.home"), ".store/drive_sample");
 
-    public static void main(String[] args) 
+    public static void main(String[] args)
         throws Exception {
         Options opt = new Options();
 
         opt.addOption("?",  "help",    false, "Show usage.");
         opt.addOption("V",  "version", false, "Print version information.");
+        opt.addOption("v",  "verbose", false, "Display progress status.");
         opt.addOption("p",  "parent",  true, "Operate inside this Google Drive folder instead of root.");
         opt.addOption("m",  "mime",           true, "Override guessed MIME type.");
         opt.addOption(null, "oob",           false, "Provide OAuth authentication out-of-band.");
@@ -88,7 +78,12 @@ public class Stream2GDrive {
             }
 
             if (args.length < 1) {
-                throw new ParseException("<cmd> missing");
+                if (cmd.hasOption("version")) {
+                    return;
+                }
+                else {
+                    throw new ParseException("<cmd> missing");
+                }
             }
 
             String command = args[0];
@@ -108,7 +103,7 @@ public class Stream2GDrive {
             VerificationCodeReceiver vcr = !cmd.hasOption("oob")
                 ? new LocalServerReceiver()
                 : new GooglePromptReceiver();
-        
+
             Credential creds = new AuthorizationCodeInstalledApp(flow, vcr)
                 .authorize("user");
 
@@ -121,11 +116,11 @@ public class Stream2GDrive {
             if (cmd.hasOption("parent")) {
                 root = findWorkingDirectory(client, cmd.getOptionValue("parent"));
             }
-            
+
             if (command.equals("get")) {
                 String remote;
                 String local;
- 
+
                 if (args.length < 2) {
                     throw new ParseException("<file> missing");
                 }
@@ -140,74 +135,33 @@ public class Stream2GDrive {
                     throw new ParseException("Too many arguments");
                 }
 
-                String link = findFileURL(client, remote, root == null ? "root" : root);
-
-                InputStream is = client.getRequestFactory().buildGetRequest(new GenericUrl(link))
-                    .execute()
-                    .getContent();
-
-                if (local.equals("-")) {
-                    IOUtils.copy(is, System.out, false);
-                }
-                else {
-                    IOUtils.copy(is, new FileOutputStream(local));
-                }
+                download(client, ht, root, remote, local, cmd.hasOption("verbose"));
             }
             else if (command.equals("put")) {
-                String file;
-                String name;
- 
+                String local;
+                String remote;
+
                 if (args.length < 2) {
                     throw new ParseException("<file> missing");
                 }
                 else if (args.length == 2) {
-                    file = args[1];
-                    name = new File(file).getName();
+                    local  = args[1];
+                    remote = new File(local).getName();
                 }
                 else if (args.length == 3) {
-                    file = args[1];
-                    name = args[2];
+                    local  = args[1];
+                    remote = args[2];
                 }
                 else {
                     throw new ParseException("Too many arguments");
                 }
 
-                com.google.api.services.drive.model.File meta = new com.google.api.services.drive.model.File();
-                meta.setTitle(cmd.getOptionValue("name", name));
-                meta.setMimeType(cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(file)));
-
-                if (root != null) {
-                    meta.setParents(Arrays.asList(new ParentReference().setId(root)));
-                }
-
-                AbstractInputStreamContent isc = file.equals("-")
-                    ? new StreamContent(meta.getMimeType(), System.in)
-                    : new FileContent(meta.getMimeType(), new File(file));
-
-                Drive.Files.Insert insert = client.files().insert(meta, isc);
-                MediaHttpUploader uploader = insert.getMediaHttpUploader();
-                uploader.setDirectUploadEnabled(false);
-                uploader.setChunkSize(10 * 1024 * 1024);
-
-                // Streaming upload with GZip encoding has horrible performance!
-                insert.setDisableGZipContent(isc instanceof StreamContent);
-                insert.execute();
+                upload(client, local, root,
+                       remote, cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(local)),
+                       cmd.hasOption("verbose"));
             }
             else if (command.equals("md5") || command.equals("list")) {
-                for (com.google.api.services.drive.model.File file : client.files().list()
-                         .setQ(String.format("'%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false",
-                                             root == null ? "root" : root))
-                         .execute()
-                         .getItems()) {
-                    if (command.equals("md5")) {
-                        System.out.println(String.format("%s *%s", file.getMd5Checksum(), file.getTitle()));
-                    }
-                    else {
-                        System.out.println(String.format("%-29s %-19s %12d %s %s", 
-                                                         file.getMimeType(), file.getLastModifyingUserName(),
-                                                         file.getFileSize(), file.getModifiedDate(), file.getTitle()));
-                    }
-                }
+                list(client, root, command.equals("md5"));
             }
             else {
                 throw new ParseException("Invalid command: " + command);
@@ -230,7 +184,88 @@ public class Stream2GDrive {
             pw.flush();
         }
         catch (IOException ex) {
-            System.err.println("I/O error: " + ex.getMessage());
+            System.err.println("I/O error: " + ex.getMessage() + ".");
+        }
+    }
+
+    public static void download(Drive client, HttpTransport ht, String root, String remote, String local, boolean progress)
+        throws IOException {
+        OutputStream os;
+
+        if (local.equals("-")) {
+            os = System.out;
+        }
+        else {
+            File file = new File(local);
+
+            if (file.exists()) {
+                throw new IOException(String.format("The local file '%s' already exists", file));
+            }
+
+            os = new FileOutputStream(file);
+        }
+
+        String link = findFileURL(client, remote, root == null ? "root" : root);
+
+        MediaHttpDownloader dl = new MediaHttpDownloader(ht, client.getRequestFactory().getInitializer());
+
+        dl.setDirectDownloadEnabled(false);
+        dl.setChunkSize(CHUNK_SIZE);
+
+        if (progress) {
+            dl.setProgressListener(new ProgressListener());
+        }
+
+        dl.download(new GenericUrl(link), os);
+    }
+
+    public static void upload(Drive client, String local, String root, String remote, String mime, boolean progress)
+        throws IOException {
+
+        com.google.api.services.drive.model.File meta = new com.google.api.services.drive.model.File();
+        meta.setTitle(remote);
+        meta.setMimeType(mime);
+
+        if (root != null) {
+            meta.setParents(Arrays.asList(new ParentReference().setId(root)));
+        }
+
+        AbstractInputStreamContent isc = local.equals("-")
+            ? new StreamContent(meta.getMimeType(), System.in)
+            : new FileContent(meta.getMimeType(), new File(local));
+
+        Drive.Files.Insert insert = client.files().insert(meta, isc);
+
+        MediaHttpUploader ul = insert.getMediaHttpUploader();
+        ul.setDirectUploadEnabled(false);
+        ul.setChunkSize(CHUNK_SIZE);
+
+        if (progress) {
+            ul.setProgressListener(new ProgressListener());
+        }
+
+        // Streaming upload with GZip encoding has horrible performance!
+        insert.setDisableGZipContent(isc instanceof StreamContent);
+
+        insert.execute();
+    }
+
+    public static void list(Drive client, String root, boolean md5)
+        throws IOException {
+
+        for (com.google.api.services.drive.model.File file : client.files().list()
+                 .setQ(String.format("'%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false",
+                                     root == null ? "root" : root))
+                 .execute()
+                 .getItems()) {
+            if (md5) {
+                System.out.println(String.format("%s *%s", file.getMd5Checksum(), file.getTitle()));
+            }
+            else {
+                System.out.println(String.format("%-29s %-19s %12d %s %s",
+                                                 file.getMimeType(), file.getLastModifyingUserName(),
+                                                 file.getFileSize(), file.getModifiedDate(), file.getTitle()));
+            }
         }
     }
 
@@ -295,6 +330,55 @@ public class Stream2GDrive {
 
         @Override public long getLength() {
             return -1;
+        }
+    }
+
+    private static class ProgressListener
+        implements MediaHttpDownloaderProgressListener, MediaHttpUploaderProgressListener {
+
+        @Override public void progressChanged(MediaHttpDownloader dl)
+            throws IOException {
+            switch (dl.getDownloadState()) {
+                case MEDIA_IN_PROGRESS:
+                    System.err.println(String.format("Downloaded %d bytes (%d %%).",
+                                                     dl.getNumBytesDownloaded(),
+                                                     (int) (dl.getProgress() * 100)));
+                    break;
+
+                case MEDIA_COMPLETE:
+                    System.err.println(String.format("Done! %d bytes downloaded.", dl.getNumBytesDownloaded()));
+                    break;
+            }
+        }
+
+        @Override public void progressChanged(MediaHttpUploader ul)
+            throws IOException {
+            switch (ul.getUploadState()) {
+                case INITIATION_STARTED:
+                    System.err.println("Preparing to upload ...");
+                    break;
+
+                case INITIATION_COMPLETE:
+                    System.err.println("Starting upload ...");
+                    break;
+
+                case MEDIA_IN_PROGRESS:
+                    try {
+                        System.err.println(String.format("Uploaded %d of %d bytes (%d %%).",
+                                                         ul.getNumBytesUploaded(),
+                                                         ul.getMediaContent().getLength(),
+                                                         (int) (ul.getProgress() * 100)));
+                    }
+                    catch (IllegalArgumentException ignored) {
+                        System.err.println(String.format("Uploaded %d bytes.", ul.getNumBytesUploaded()));
+                    }
+
+                    break;
+
+                case MEDIA_COMPLETE:
+                    System.err.println(String.format("Done! %d bytes uploaded.", ul.getNumBytesUploaded()));
+                    break;
+            }
         }
     }
 }
