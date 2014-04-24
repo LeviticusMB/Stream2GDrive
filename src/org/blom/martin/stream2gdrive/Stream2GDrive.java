@@ -354,8 +354,8 @@ public class Stream2GDrive {
             throws IOException {
             switch (dl.getDownloadState()) {
                 case MEDIA_IN_PROGRESS:
-                    System.err.println(String.format("Downloaded %d bytes (%d %%).",
-                                                     dl.getNumBytesDownloaded(),
+                    System.err.println(String.format("Downloaded %d MiB (%d %%).",
+                                                     dl.getNumBytesDownloaded() / 1024 / 1024,
                                                      (int) (dl.getProgress() * 100)));
                     break;
 
@@ -378,13 +378,13 @@ public class Stream2GDrive {
 
                 case MEDIA_IN_PROGRESS:
                     try {
-                        System.err.println(String.format("Uploaded %d of %d bytes (%d %%).",
-                                                         ul.getNumBytesUploaded(),
-                                                         ul.getMediaContent().getLength(),
+                        System.err.println(String.format("Uploaded %d of %d MiB (%d %%).",
+                                                         ul.getNumBytesUploaded() / 1024 / 1024,
+                                                         ul.getMediaContent().getLength() / 1024 / 1024,
                                                          (int) (ul.getProgress() * 100)));
                     }
                     catch (IllegalArgumentException ignored) {
-                        System.err.println(String.format("Uploaded %d bytes.", ul.getNumBytesUploaded()));
+                        System.err.println(String.format("Uploaded %d MiB.", ul.getNumBytesUploaded() / 1024 / 1024));
                     }
 
                     break;
