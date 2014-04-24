@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+
+<project name="Stream2GDrive" default="jar">
+  <description>Stream2GDrive build file</description>
+
+  <property name="src.dir"     location="src"/>
+  <property name="lib.dir"     location="lib"/>
+  <property name="build.dir"   location="build"/>
+  <property name="classes.dir" location="${build.dir}/classes"/>
+
+  <property name="build.compiler" value="modern"/>
+
+  <taskdef name="one-jar" classname="com.simontuffs.onejar.ant.OneJarTask" 
+           classpath="${lib.dir}/build/one-jar-ant-task-0.96d.jar" onerror="report"/>
+
+  <path id="classpath">
+    <pathelement path="${classes.dir}"/>
+    <fileset dir="${lib.dir}" includes="*.jar"/>
+  </path>
+
+  <target name="init">
+    <tstamp>
+      <format property="build.date" pattern="yyyy-MM-dd HH:mm:ss"/>
+    </tstamp>
+
+    <mkdir dir="${classes.dir}"/>
+
+    <exec executable="git" outputproperty="git.version" failifexecutionfails="false" errorproperty="">
+      <arg value="describe"/>
+      <arg value="--all"/>
+      <arg value="--tags"/>
+      <arg value="--long"/>
+      <arg value="--dirty"/>
+    </exec>
+
+    <filterset id="build">
+      <filter token="name"    value="${ant.project.name}" />
+      <filter token="version" value="${git.version}" />
+      <filter token="date"    value="${build.date}" />
+    </filterset>
+  </target>
+
+  <target name="compile" depends="init" description="compile everything">
+    <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath"
+           debug="true" deprecation="true" source="1.6" target="1.6" includeantruntime="false">
+      <compilerarg value="-Xlint"/>
+    </javac>
+  </target>
+
+  <target name="jar" depends="compile" description="generate all main jar files" >
+    <copy todir="${build.dir}/res" overwrite="true">
+      <fileset dir="res" includes="*.in"/>
+      <globmapper from="*.in" to="*" />
+      <filterset refid="build" />
+    </copy>
+
+    <copy todir="${build.dir}/res" overwrite="true">
+      <fileset dir="res" excludes="*.in"/>
+    </copy>
+
+    <one-jar destfile="${build.dir}/stream2gdrive.jar">
+      <manifest>
+        <attribute name="One-Jar-Main-Class" value="org.blom.martin.stream2gdrive.Stream2GDrive"/>
+      </manifest>
+      <fileset dir="${build.dir}/res"/>
+      <main>
+        <fileset dir="${classes.dir}" />
+      </main>
+      <lib>
+        <fileset dir="${lib.dir}" includes="*.jar" />
+      </lib>
+    </one-jar>
+  </target>
+
+  <target name="clean" description="clean up" >
+    <delete dir="${build.dir}"/>
+  </target>
+</project>
