@@ -34,20 +34,21 @@ import com.google.api.services.drive.model.ParentReference;
 public class Stream2GDrive {
     private static final String APP_NAME    = "Stream2GDrive";
     private static final String APP_VERSION = "1.0";
-    private static final int    CHUNK_SIZE  = 10 * 1024 * 1024;
 
     public static void main(String[] args)
         throws Exception {
         Options opt = new Options();
 
-        opt.addOption("?",  "help",     false, "Show usage.");
-        opt.addOption("V",  "version",  false, "Print version information.");
-        opt.addOption("v",  "verbose",  false, "Display progress status.");
+        opt.addOption("?",  "help",      false, "Show usage.");
+        opt.addOption("V",  "version",   false, "Print version information.");
+        opt.addOption("v",  "verbose",   false, "Display progress status.");
 
-        opt.addOption("p",  "parent",   true, "Operate inside this Google Drive folder instead of root.");
-        opt.addOption("o",  "output",   true, "Override output/destination file name");
-        opt.addOption("m",  "mime",     true, "Override guessed MIME type.");
-        opt.addOption(null, "oob",      false, "Provide OAuth authentication out-of-band.");
+        opt.addOption("p",  "parent",     true, "Operate inside this Google Drive folder instead of root.");
+        opt.addOption("o",  "output",     true, "Override output/destination file name");
+        opt.addOption("m",  "mime",       true, "Override guessed MIME type.");
+        opt.addOption("C",  "chunk-size", true, "Set transfer chunk size, in MiB. Default is 10.0 MiB.");
+
+        opt.addOption(null, "oob",       false, "Provide OAuth authentication out-of-band.");
 
         try {
             CommandLine cmd = new GnuParser().parse(opt, args, false);
@@ -109,6 +110,9 @@ public class Stream2GDrive {
                 .setApplicationName(APP_NAME + "/" + APP_VERSION)
                 .build();
 
+            boolean verbose = cmd.hasOption("verbose");
+            float chunkSize = Float.parseFloat(cmd.getOptionValue("chunk-size", "10.0"));
+
             String root = null;
 
             if (cmd.hasOption("parent")) {
@@ -128,7 +132,8 @@ public class Stream2GDrive {
                     throw new ParseException("Too many arguments");
                 }
 
-                download(client, ht, root, file, cmd.getOptionValue("output", file), cmd.hasOption("verbose"));
+                download(client, ht, root, file, cmd.getOptionValue("output", file),
+                         verbose, chunkSize);
             }
             else if (command.equals("put")) {
                 String file;
@@ -143,10 +148,9 @@ public class Stream2GDrive {
                     throw new ParseException("Too many arguments");
                 }
 
-                upload(client, file, root,
-                       cmd.getOptionValue("output", new File(file).getName()),
+                upload(client, file, root, cmd.getOptionValue("output", new File(file).getName()),
                        cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(file)),
-                       cmd.hasOption("verbose"));
+                       verbose, chunkSize);
             }
             else if (command.equals("md5") || command.equals("list")) {
                 if (args.length > 1) {
@@ -175,12 +179,15 @@ public class Stream2GDrive {
 
             pw.flush();
         }
+        catch (NumberFormatException ex) {
+            System.err.println("Invalid decimal number: " + ex.getMessage() + ".");
+        }
         catch (IOException ex) {
             System.err.println("I/O error: " + ex.getMessage() + ".");
         }
     }
 
-    public static void download(Drive client, HttpTransport ht, String root, String remote, String local, boolean progress)
+    public static void download(Drive client, HttpTransport ht, String root, String remote, String local, boolean progress, float chunkSize)
         throws IOException {
         OutputStream os;
 
@@ -202,7 +209,7 @@ public class Stream2GDrive {
         MediaHttpDownloader dl = new MediaHttpDownloader(ht, client.getRequestFactory().getInitializer());
 
         dl.setDirectDownloadEnabled(false);
-        dl.setChunkSize(CHUNK_SIZE);
+        dl.setChunkSize(calcChunkSize(chunkSize));
 
         if (progress) {
             dl.setProgressListener(new ProgressListener());
@@ -211,7 +218,7 @@ public class Stream2GDrive {
         dl.download(new GenericUrl(link), os);
     }
 
-    public static void upload(Drive client, String local, String root, String remote, String mime, boolean progress)
+    public static void upload(Drive client, String local, String root, String remote, String mime, boolean progress, float chunkSize)
         throws IOException {
 
         com.google.api.services.drive.model.File meta = new com.google.api.services.drive.model.File();
@@ -230,7 +237,7 @@ public class Stream2GDrive {
 
         MediaHttpUploader ul = insert.getMediaHttpUploader();
         ul.setDirectUploadEnabled(false);
-        ul.setChunkSize(CHUNK_SIZE);
+        ul.setChunkSize(calcChunkSize(chunkSize));
 
         if (progress) {
             ul.setProgressListener(new ProgressListener());
@@ -259,6 +266,12 @@ public class Stream2GDrive {
                                                  file.getFileSize(), file.getModifiedDate(), file.getTitle()));
             }
         }
+    }
+
+    private static int calcChunkSize(float chunkSizeInMiB) {
+        int multiple = Math.round(chunkSizeInMiB * 1024 * 1024 / MediaHttpUploader.MINIMUM_CHUNK_SIZE);
+
+        return Math.max(1, multiple) * MediaHttpUploader.MINIMUM_CHUNK_SIZE;
     }
 
     private static String findWorkingDirectory(Drive client, String name)
