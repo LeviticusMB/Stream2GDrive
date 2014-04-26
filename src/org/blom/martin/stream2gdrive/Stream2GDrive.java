@@ -350,13 +350,17 @@ public class Stream2GDrive {
     private static class ProgressListener
         implements MediaHttpDownloaderProgressListener, MediaHttpUploaderProgressListener {
 
+        private long startTime = System.currentTimeMillis();
+        private long startByte = 0;
+
         @Override public void progressChanged(MediaHttpDownloader dl)
             throws IOException {
             switch (dl.getDownloadState()) {
                 case MEDIA_IN_PROGRESS:
-                    System.err.println(String.format("Downloaded %d MiB (%d %%).",
+                    System.err.println(String.format("Downloaded %d MiB (%d %%). Current speed is %.1f MiB/s.",
                                                      dl.getNumBytesDownloaded() / 1024 / 1024,
-                                                     (int) (dl.getProgress() * 100)));
+                                                     (int) (dl.getProgress() * 100),
+                                                     calcSpeed(dl.getNumBytesDownloaded())));
                     break;
 
                 case MEDIA_COMPLETE:
@@ -378,13 +382,16 @@ public class Stream2GDrive {
 
                 case MEDIA_IN_PROGRESS:
                     try {
-                        System.err.println(String.format("Uploaded %d of %d MiB (%d %%).",
+                        System.err.println(String.format("Uploaded %d of %d MiB (%d %%). Current speed is %.1f MiB/s.",
                                                          ul.getNumBytesUploaded() / 1024 / 1024,
                                                          ul.getMediaContent().getLength() / 1024 / 1024,
-                                                         (int) (ul.getProgress() * 100)));
+                                                         (int) (ul.getProgress() * 100),
+                                                         calcSpeed(ul.getNumBytesUploaded())));
                     }
                     catch (IllegalArgumentException ignored) {
-                        System.err.println(String.format("Uploaded %d MiB.", ul.getNumBytesUploaded() / 1024 / 1024));
+                        System.err.println(String.format("Uploaded %d MiB. Current speed is %.1f MiB/s.",
+                                                         ul.getNumBytesUploaded() / 1024 / 1024,
+                                                         calcSpeed(ul.getNumBytesUploaded())));
                     }
 
                     break;
@@ -393,6 +400,17 @@ public class Stream2GDrive {
                     System.err.println(String.format("Done! %d bytes uploaded.", ul.getNumBytesUploaded()));
                     break;
             }
+        }
+
+        private double calcSpeed(long currentPosition) {
+            long   now = System.currentTimeMillis();
+            double mib = (currentPosition - startByte) / (1.0 * 1024 * 1024);
+            double sec = (now - startTime) / 1000.0;
+
+            startByte = currentPosition;
+            startTime = now;
+
+            return mib / sec;
         }
     }
 }
