@@ -184,6 +184,7 @@ public class Stream2GDrive {
         }
         catch (IOException ex) {
             System.err.println("I/O error: " + ex.getMessage() + ".");
+            System.exit(-1); // Notify that we encountered an error
         }
     }
 
