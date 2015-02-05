@@ -152,6 +152,21 @@ public class Stream2GDrive {
                        cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(file)),
                        verbose, chunkSize);
             }
+            else if (command.equals("trash")) {
+                String file;
+
+                if (args.length < 2) {
+                    throw new ParseException("<file> missing");
+                }
+                else if (args.length == 2) {
+                    file = args[1];
+                }
+                else {
+                    throw new ParseException("Too many arguments");
+                }
+
+                trash(client, root, file);
+            }
             else if (command.equals("md5") || command.equals("list")) {
                 if (args.length > 1) {
                     throw new ParseException("Too many arguments");
@@ -168,7 +183,7 @@ public class Stream2GDrive {
             HelpFormatter hf = new HelpFormatter();
 
             hf.printHelp(pw, 80, "stream2gdrive [OPTIONS] <cmd> [<options>]",
-                         "  Commands: get <file>, list, md5, put <file>.",
+                         "  Commands: get <file>, list, md5, put <file>, trash <file>.",
                          opt, 2, 8,
                          "Use '-' as <file> for standard input.");
 
@@ -266,6 +281,27 @@ public class Stream2GDrive {
                                                  file.getMimeType(), file.getLastModifyingUserName(),
                                                  file.getFileSize(), file.getModifiedDate(), file.getTitle()));
             }
+        }
+    }
+
+    public static void trash(Drive client, String root, String remote)
+        throws IOException {
+
+        boolean fileFound = false;
+        for (com.google.api.services.drive.model.File file : client.files().list()
+                 .setQ(String.format("'%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false",
+                                     root == null ? "root" : root))
+                 .execute()
+                 .getItems()) {
+            if (file.getTitle().equals(remote)) {
+                System.out.println(String.format("Trashing file '%s'.", file.getTitle()));
+                client.files().trash(file.getId()).execute();
+                fileFound = true;
+            }
+        }
+
+        if ( !fileFound ) {
+            System.out.println(String.format("File '%s' not found.", remote));
         }
     }
 
