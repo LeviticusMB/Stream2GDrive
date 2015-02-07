@@ -33,7 +33,7 @@ import com.google.api.services.drive.model.ParentReference;
 
 public class Stream2GDrive {
     private static final String APP_NAME    = "Stream2GDrive";
-    private static final String APP_VERSION = "1.1";
+    private static final String APP_VERSION = "1.2";
 
     private static final int EX_USAGE = 64;
     private static final int EX_IOERR = 74;
