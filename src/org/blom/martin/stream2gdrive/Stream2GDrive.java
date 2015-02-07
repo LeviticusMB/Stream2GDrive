@@ -35,6 +35,9 @@ public class Stream2GDrive {
     private static final String APP_NAME    = "Stream2GDrive";
     private static final String APP_VERSION = "1.1";
 
+    private static final int EX_USAGE = 64;
+    private static final int EX_IOERR = 74;
+
     public static void main(String[] args)
         throws Exception {
         Options opt = new Options();
@@ -152,6 +155,21 @@ public class Stream2GDrive {
                        cmd.getOptionValue("mime", new javax.activation.MimetypesFileTypeMap().getContentType(file)),
                        verbose, chunkSize);
             }
+            else if (command.equals("trash")) {
+                String file;
+
+                if (args.length < 2) {
+                    throw new ParseException("<file> missing");
+                }
+                else if (args.length == 2) {
+                    file = args[1];
+                }
+                else {
+                    throw new ParseException("Too many arguments");
+                }
+
+                trash(client, root, file);
+            }
             else if (command.equals("md5") || command.equals("list")) {
                 if (args.length > 1) {
                     throw new ParseException("Too many arguments");
@@ -168,7 +186,7 @@ public class Stream2GDrive {
             HelpFormatter hf = new HelpFormatter();
 
             hf.printHelp(pw, 80, "stream2gdrive [OPTIONS] <cmd> [<options>]",
-                         "  Commands: get <file>, list, md5, put <file>.",
+                         "  Commands: get <file>, list, md5, put <file>, trash <file>.",
                          opt, 2, 8,
                          "Use '-' as <file> for standard input.");
 
@@ -178,12 +196,15 @@ public class Stream2GDrive {
             }
 
             pw.flush();
+            System.exit(EX_USAGE);
         }
         catch (NumberFormatException ex) {
             System.err.println("Invalid decimal number: " + ex.getMessage() + ".");
+            System.exit(EX_USAGE);
         }
         catch (IOException ex) {
             System.err.println("I/O error: " + ex.getMessage() + ".");
+            System.exit(EX_IOERR);
         }
     }
 
@@ -204,7 +225,7 @@ public class Stream2GDrive {
             os = new FileOutputStream(file);
         }
 
-        String link = findFileURL(client, remote, root == null ? "root" : root);
+        String link = findFile(client, remote, root == null ? "root" : root).getDownloadUrl();
 
         MediaHttpDownloader dl = new MediaHttpDownloader(ht, client.getRequestFactory().getInitializer());
 
@@ -268,6 +289,12 @@ public class Stream2GDrive {
         }
     }
 
+    public static void trash(Drive client, String root, String remote)
+        throws IOException {
+
+        client.files().trash(findFile(client, remote, root == null ? "root" : root).getId()).execute();
+    }
+
     private static int calcChunkSize(float chunkSizeInMiB) {
         int multiple = Math.round(chunkSizeInMiB * 1024 * 1024 / MediaHttpUploader.MINIMUM_CHUNK_SIZE);
 
@@ -293,7 +320,7 @@ public class Stream2GDrive {
         }
     }
 
-    private static String findFileURL(Drive client, String name, String parent)
+    private static com.google.api.services.drive.model.File findFile(Drive client, String name, String parent)
         throws IOException {
         List<com.google.api.services.drive.model.File> file = client.files().list()
             .setQ(String.format("title='%s' and '%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false", name, parent))
@@ -307,7 +334,7 @@ public class Stream2GDrive {
             throw new IOException(String.format("File '%s' matched more than one document", name));
         }
         else {
-            return file.get(0).getDownloadUrl();
+            return file.get(0);
         }
     }
 

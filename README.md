@@ -29,12 +29,13 @@ Verify checksums:
 
 # Usage #
 
-There are four commands available:
+There are five commands available:
 
 * get
 * list
 * md5
 * put
+* trash
 
 The first time you start the program, it will ask for permission to
 access your account. Normally, this will open a browser window and the
@@ -92,6 +93,14 @@ file name with <code>--output</code> and use <code>--mime</code> to
 override the MIME type.
 
 <code>--verbose</code> enables progress reporting.
+
+## trash ##
+
+    stream2gdrive trash <name>
+        [--parent <remote-folder>]
+
+Move a file in your Google Drive's root folder (unless
+<code>--parent</code> is specified) to the trash.
 
 # Author & License #
 
