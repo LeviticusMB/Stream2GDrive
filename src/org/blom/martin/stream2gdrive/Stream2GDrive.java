@@ -35,6 +35,9 @@ public class Stream2GDrive {
     private static final String APP_NAME    = "Stream2GDrive";
     private static final String APP_VERSION = "1.1";
 
+    private static final int EX_USAGE = 64;
+    private static final int EX_IOERR = 74;
+
     public static void main(String[] args)
         throws Exception {
         Options opt = new Options();
@@ -193,13 +196,15 @@ public class Stream2GDrive {
             }
 
             pw.flush();
+            System.exit(EX_USAGE);
         }
         catch (NumberFormatException ex) {
             System.err.println("Invalid decimal number: " + ex.getMessage() + ".");
+            System.exit(EX_USAGE);
         }
         catch (IOException ex) {
             System.err.println("I/O error: " + ex.getMessage() + ".");
-            System.exit(-1); // Notify that we encountered an error
+            System.exit(EX_IOERR);
         }
     }
 
