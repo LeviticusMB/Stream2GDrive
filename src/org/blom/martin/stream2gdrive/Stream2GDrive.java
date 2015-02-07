@@ -225,7 +225,7 @@ public class Stream2GDrive {
             os = new FileOutputStream(file);
         }
 
-        String link = findFileURL(client, remote, root == null ? "root" : root);
+        String link = findFile(client, remote, root == null ? "root" : root).getDownloadUrl();
 
         MediaHttpDownloader dl = new MediaHttpDownloader(ht, client.getRequestFactory().getInitializer());
 
@@ -292,22 +292,7 @@ public class Stream2GDrive {
     public static void trash(Drive client, String root, String remote)
         throws IOException {
 
-        boolean fileFound = false;
-        for (com.google.api.services.drive.model.File file : client.files().list()
-                 .setQ(String.format("'%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false",
-                                     root == null ? "root" : root))
-                 .execute()
-                 .getItems()) {
-            if (file.getTitle().equals(remote)) {
-                System.out.println(String.format("Trashing file '%s'.", file.getTitle()));
-                client.files().trash(file.getId()).execute();
-                fileFound = true;
-            }
-        }
-
-        if ( !fileFound ) {
-            System.out.println(String.format("File '%s' not found.", remote));
-        }
+        client.files().trash(findFile(client, remote, root == null ? "root" : root).getId()).execute();
     }
 
     private static int calcChunkSize(float chunkSizeInMiB) {
@@ -335,7 +320,7 @@ public class Stream2GDrive {
         }
     }
 
-    private static String findFileURL(Drive client, String name, String parent)
+    private static com.google.api.services.drive.model.File findFile(Drive client, String name, String parent)
         throws IOException {
         List<com.google.api.services.drive.model.File> file = client.files().list()
             .setQ(String.format("title='%s' and '%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false", name, parent))
@@ -349,7 +334,7 @@ public class Stream2GDrive {
             throw new IOException(String.format("File '%s' matched more than one document", name));
         }
         else {
-            return file.get(0).getDownloadUrl();
+            return file.get(0);
         }
     }
 
