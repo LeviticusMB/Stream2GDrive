@@ -272,21 +272,27 @@ public class Stream2GDrive {
 
     public static void list(Drive client, String root, boolean md5)
         throws IOException {
+        com.google.api.services.drive.Drive.Files.List request = client.files().list()
+            .setQ(String.format("'%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false",
+                                root == null ? "root" : root))
+            .setMaxResults(1000);
 
-        for (com.google.api.services.drive.model.File file : client.files().list()
-                 .setQ(String.format("'%s' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false",
-                                     root == null ? "root" : root))
-                 .execute()
-                 .getItems()) {
-            if (md5) {
-                System.out.println(String.format("%s *%s", file.getMd5Checksum(), file.getTitle()));
+        do {
+            com.google.api.services.drive.model.FileList files = request.execute();
+
+            for (com.google.api.services.drive.model.File file : files.getItems()) {
+                if (md5) {
+                    System.out.println(String.format("%s *%s", file.getMd5Checksum(), file.getTitle()));
+                }
+                else {
+                    System.out.println(String.format("%-29s %-19s %12d %s %s",
+                                                     file.getMimeType(), file.getLastModifyingUserName(),
+                                                     file.getFileSize(), file.getModifiedDate(), file.getTitle()));
+                }
             }
-            else {
-                System.out.println(String.format("%-29s %-19s %12d %s %s",
-                                                 file.getMimeType(), file.getLastModifyingUserName(),
-                                                 file.getFileSize(), file.getModifiedDate(), file.getTitle()));
-            }
-        }
+
+            request.setPageToken(files.getNextPageToken());
+        } while (request.getPageToken() != null && request.getPageToken().length() > 0);
     }
 
     public static void trash(Drive client, String root, String remote)
