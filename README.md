@@ -11,6 +11,10 @@ dependency is Java.
 
 ## Quickstart ##
 
+Download the latest release. Mac users can simply install using homebrew:
+
+    brew install leviticusmb/mac/stream2gdrive
+
 Backup /opt to Google Drive, encrypted:
 
     tar cfvz - /opt | gpg -e -r you@example.com | stream2gdrive put - --output opt-2014-04-24.tar.gz
